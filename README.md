@@ -1,2 +1,4 @@
-# python-rdf-controller
-The controller for a fraud detection system. Sends the logs to the RDF controller and stores the response in a graph store.
+# Python RDF Controller
+The controller for a fraud detection system.
+
+This app is sending json logs to this RDF conversion service: https://github.com/bogdanbledea/python-rdf-converter and then stores the response in a graph store.
