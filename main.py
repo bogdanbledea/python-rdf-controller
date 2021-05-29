@@ -1,47 +1,49 @@
+from datetime import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask import Flask, request
 import pandas as pd
 import requests
-import json
 
-def send_json_to_api(json_log):
-    r = requests.post('http://localhost:5000/api/convert', json=json_log)
+# read the test file
+data = pd.read_csv('date_test.csv')
+
+# convert date column to datetime, so python can understand
+data['Time'] = pd.to_datetime(data['Time'])
+
+# create the scheduler
+scheduler = BackgroundScheduler()
+
+# create a variable to increment
+initial_moment = pd.to_datetime('19/05/20, 10:54')
+time_interval = 1
+
+
+def periodic_job():
+    global initial_moment
+    initial_moment += pd.Timedelta(minutes=1)
+    next_moment = initial_moment + pd.Timedelta(minutes=1)
+    logs = data[(data['Time'] >= initial_moment) & (data['Time'] < next_moment)]
+    logs_to_json = logs.to_json(orient="records")
+    r = requests.post('http://localhost:5000/api/convert', json=logs_to_json)
     print(r.content)
 
 
-def read_file():
-    #Read the test csv file to submit to the converter service
-    data = pd.read_csv('date_test.csv')
+scheduler.add_job(periodic_job, 'interval', minutes=time_interval, next_run_time=datetime.now())
 
-    # Get the first log and convert it to json
-    json_data = data[0:1].to_json()
+app = Flask(__name__)
 
-    # Parse the json to access the object
-    open_json = json.loads(json_data)
 
-    # Create the json object to be sent in the POST request
-    log_time = open_json['Time']['0']
-    log_event_context = open_json['Event context']['0']
-    log_user_full_name = open_json['User full name']['0']
-    log_affected_user = open_json['Affected user']['0']
-    log_component = open_json['Component']['0']
-    log_event_name = open_json['Event name']['0']
-    log_description = open_json['Description']['0']
-    log_origin = open_json['Origin']['0']
-    log_ip_address = open_json['IP address']['0']
+@app.route('/api/start', methods=['POST'])
+def start_scheduler():
+    scheduler.start()
+    return 'started the scheduler!'
 
-    log_json = {
-        "time": log_time,
-        "userFullName": log_user_full_name,
-        "affectedUser": log_affected_user,
-        "eventContext": log_event_context,
-        "component": log_component,
-        "eventName": log_event_name,
-        "description": log_description,
-        "origin": log_origin,
-        "ipAddress": log_ip_address
-    }
 
-    send_json_to_api(log_json)
+@app.route('/api/stop', methods=['POST'])
+def stop_scheduler():
+    scheduler.shutdown()
+    return 'stopped the scheduler!'
+
 
 if __name__ == '__main__':
-    read_file()
-
+    app.run(port=6000)
